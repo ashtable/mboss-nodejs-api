@@ -12,24 +12,36 @@ import {
 } from '@mboss/zod';
 
 /**
- * `mboss-zod` mirrors the Prisma enums by hand — it is the wire and must not depend on the
- * database — and this repo is the only one where both live. So this is where the mirrors are
- * checked mechanically.
+ * `mboss-zod` mirrors the Prisma enums
+ * by hand — it is the wire and must not
+ * depend on the database — and this repo
+ * is the only one where both live. So
+ * this is where the mirrors are checked
+ * mechanically.
  *
- * The Prisma side is read from the schema text rather than from the generated client: the client
- * reflects whatever the last `prisma generate` produced, and a drift test that can pass against a
- * stale artifact is not a drift test. The generated client is checked too, against the same text,
- * which is what catches a stale `node_modules`.
+ * The Prisma side is read from the schema
+ * text rather than from the generated
+ * client: the client reflects whatever
+ * the last `prisma generate` produced,
+ * and a drift test that can pass against
+ * a stale artifact is not a drift test.
+ * The generated client is checked too,
+ * against the same text, which is what
+ * catches a stale `node_modules`.
  */
 const schemaPath = fileURLToPath(
   new URL('../mboss-database/prisma/schema.prisma', import.meta.url),
 );
 const source = readFileSync(schemaPath, 'utf8');
 
-/** Members of `enum <name> { ... }` in declaration order, comments stripped. */
+/**
+ * Members of `enum <name> { ... }` in
+ * declaration order, comments stripped.
+ */
 function prismaEnumMembers(name: string): string[] {
   const body = new RegExp(`enum\\s+${name}\\s*\\{([^}]*)\\}`).exec(source)?.[1];
-  if (body === undefined) throw new Error(`enum ${name} not found in schema.prisma`);
+  if (body === undefined)
+    throw new Error(`enum ${name} not found in schema.prisma`);
   return body
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, '').trim())
@@ -37,10 +49,26 @@ function prismaEnumMembers(name: string): string[] {
 }
 
 const pairs = [
-  ['SubscriberStatus', SubscriberStatusSchema.options, Object.values($Enums.SubscriberStatus)],
-  ['SubscriberSource', SubscriberSourceSchema.options, Object.values($Enums.SubscriberSource)],
-  ['BroadcastStatus', BroadcastStatusSchema.options, Object.values($Enums.BroadcastStatus)],
-  ['DeliveryStatus', DeliveryStatusSchema.options, Object.values($Enums.DeliveryStatus)],
+  [
+    'SubscriberStatus',
+    SubscriberStatusSchema.options,
+    Object.values($Enums.SubscriberStatus),
+  ],
+  [
+    'SubscriberSource',
+    SubscriberSourceSchema.options,
+    Object.values($Enums.SubscriberSource),
+  ],
+  [
+    'BroadcastStatus',
+    BroadcastStatusSchema.options,
+    Object.values($Enums.BroadcastStatus),
+  ],
+  [
+    'DeliveryStatus',
+    DeliveryStatusSchema.options,
+    Object.values($Enums.DeliveryStatus),
+  ],
 ] as const;
 
 describe.each(pairs)('%s', (name, mirror, generated) => {

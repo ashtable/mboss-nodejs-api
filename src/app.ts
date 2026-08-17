@@ -1,5 +1,8 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
+import {
+  serializerCompiler,
+  validatorCompiler,
+} from 'fastify-type-provider-zod';
 
 import type { LinkKeyRing } from '@mboss/core/signed-links';
 
@@ -13,28 +16,43 @@ import { internalRoutes } from './routes/internal.js';
 import { waitlistRoutes } from './routes/waitlist.js';
 import type { Store } from './store/types.js';
 
+/**
+ * Dependencies that `buildApp` wires together
+ * rather than constructing itself, so tests can
+ * hand it doubles for the store, the queue, and
+ * the key ring.
+ */
 export interface AppDeps {
   store: Store;
   enqueuer: WorkflowEnqueuer;
   keyRing: LinkKeyRing;
   webServiceToken: string;
   internalApiToken: string;
-  /** Overridden only by tests, so the 24h resend rule can be exercised at a fixed instant. */
+  /** Overridden only by tests, so the 24h resend
+   * rule can be exercised at a fixed instant. */
   now?: () => Date;
 }
 
 /**
- * Builds the server from dependencies it is handed. It opens no connections and constructs no
- * clients, which is what lets the whole route surface be tested against in-memory doubles with no
- * database and no network anywhere in CI.
+ * Builds the server from dependencies it is
+ * handed. It opens no connections and constructs
+ * no clients, which is what lets the whole route
+ * surface be tested against in-memory doubles
+ * with no database and no network anywhere in CI.
  *
- * The two bearer tokens guard encapsulated plugin scopes rather than a global hook matching on
- * URL prefixes: a route is protected because of where it was registered, so a new route cannot be
- * added outside the guard by getting its path wrong.
+ * The two bearer tokens guard encapsulated plugin
+ * scopes rather than a global hook matching on
+ * URL prefixes: a route is protected because of
+ * where it was registered, so a new route cannot
+ * be added outside the guard by getting its path
+ * wrong.
  */
 export function buildApp(deps: AppDeps): FastifyInstance {
-  // A manage link's token is a path parameter of roughly 175 characters — a base64url payload plus
-  // a base64url HMAC — and Fastify's default cap of 100 would answer every one of them with a 414.
+  // A manage link's token is a path parameter of
+  // roughly 175 characters — a base64url payload
+  // plus a base64url HMAC — and Fastify's default
+  // cap of 100 would answer every one of them
+  // with a 414.
   const app = Fastify({ routerOptions: { maxParamLength: 512 } });
 
   app.setValidatorCompiler(validatorCompiler);

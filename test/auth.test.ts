@@ -20,7 +20,10 @@ function appGuardedBy(token: string): FastifyInstance {
 
 describe('requireBearer', () => {
   it('rejects a request with no Authorization header', async () => {
-    const response = await appGuardedBy(TOKEN).inject({ method: 'GET', url: '/guarded' });
+    const response = await appGuardedBy(TOKEN).inject({
+      method: 'GET',
+      url: '/guarded',
+    });
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({ error: 'Unauthorized', statusCode: 401 });
@@ -47,7 +50,9 @@ describe('requireBearer', () => {
   });
 
   it('rejects a token that merely starts with the right value', async () => {
-    // The length guard exists so `timingSafeEqual` never throws; this pins that it also rejects.
+    // The length guard exists so
+    // `timingSafeEqual` never throws;
+    // this pins that it also rejects.
     const response = await appGuardedBy(TOKEN).inject({
       method: 'GET',
       url: '/guarded',
@@ -72,7 +77,8 @@ describe('requireBearer', () => {
 describe('the two token scopes', () => {
   const web = `Bearer ${TEST_WEB_SERVICE_TOKEN}`;
   const internal = `Bearer ${TEST_INTERNAL_API_TOKEN}`;
-  const seedOne: Seed = (s) => void s.seedSubscriber({ email: 'a@example.com' });
+  const seedOne: Seed = (s) =>
+    void s.seedSubscriber({ email: 'a@example.com' });
 
   function reach(authorization: string | undefined, url: string) {
     const { app } = buildTestApp({ seed: seedOne });
@@ -95,14 +101,20 @@ describe('the two token scopes', () => {
   });
 
   it('treats a missing x-admin-actor as a bad request, not an authentication failure', async () => {
-    // Authentication is the bearer token; the header is an audit value mboss-web supplies.
+    // Authentication is the bearer token;
+    // the header is an audit value
+    // mboss-web supplies.
     const { app } = buildTestApp();
 
     const response = await app.inject({
       method: 'POST',
       url: '/v1/admin/broadcasts',
       headers: { authorization: web },
-      payload: { subject: 'Hi', bodyMarkdown: 'There', audience: ['subscribed'] },
+      payload: {
+        subject: 'Hi',
+        bodyMarkdown: 'There',
+        audience: ['subscribed'],
+      },
     });
 
     expect(response.statusCode).toBe(400);

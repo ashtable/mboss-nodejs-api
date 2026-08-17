@@ -31,7 +31,8 @@ function probeApp() {
     method: 'GET',
     url: '/probe/response',
     schema: { response: { 200: z.object({ n: z.number() }) } },
-    // Deliberately violates its own response schema.
+    // Deliberately violates its own
+    // response schema.
     handler: async () => ({ n: 'not a number' }) as unknown as { n: number },
   });
 
@@ -47,13 +48,22 @@ describe('error handler', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({ error: 'Validation Error', statusCode: 400 });
+    expect(response.json()).toMatchObject({
+      error: 'Validation Error',
+      statusCode: 400,
+    });
   });
 
   it('turns a response-schema violation into a 500', async () => {
-    const response = await probeApp().inject({ method: 'GET', url: '/probe/response' });
+    const response = await probeApp().inject({
+      method: 'GET',
+      url: '/probe/response',
+    });
 
     expect(response.statusCode).toBe(500);
-    expect(response.json()).toMatchObject({ error: 'Internal Server Error', statusCode: 500 });
+    expect(response.json()).toMatchObject({
+      error: 'Internal Server Error',
+      statusCode: 500,
+    });
   });
 });

@@ -12,7 +12,9 @@ describe('GET /healthz', () => {
   });
 
   it('requires no authorization', async () => {
-    // Railway's healthcheck hits this from inside the private network and carries no bearer token.
+    // Railway's healthcheck hits this from
+    // inside the private network and carries
+    // no bearer token.
     const { app } = buildTestApp();
     const response = await app.inject({ method: 'GET', url: '/healthz' });
 

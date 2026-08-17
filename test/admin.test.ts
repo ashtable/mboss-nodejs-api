@@ -23,7 +23,10 @@ describe('GET /v1/admin/waitlist', () => {
   };
 
   it('returns every subscriber newest first', async () => {
-    const response = await get(buildTestApp({ seed: fourSubscribers }), '/v1/admin/waitlist');
+    const response = await get(
+      buildTestApp({ seed: fourSubscribers }),
+      '/v1/admin/waitlist',
+    );
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
@@ -37,7 +40,9 @@ describe('GET /v1/admin/waitlist', () => {
   });
 
   it('returns the full row shape', async () => {
-    const test = buildTestApp({ seed: (s) => void s.seedSubscriber({ email: 'a@example.com' }) });
+    const test = buildTestApp({
+      seed: (s) => void s.seedSubscriber({ email: 'a@example.com' }),
+    });
 
     const body = (await get(test, '/v1/admin/waitlist')).json();
 
@@ -53,23 +58,36 @@ describe('GET /v1/admin/waitlist', () => {
 
   it('filters by status', async () => {
     const body = (
-      await get(buildTestApp({ seed: fourSubscribers }), '/v1/admin/waitlist?status=paused')
+      await get(
+        buildTestApp({ seed: fourSubscribers }),
+        '/v1/admin/waitlist?status=paused',
+      )
     ).json();
 
-    expect(body.rows.map((row: { email: string }) => row.email)).toEqual(['b@example.com']);
+    expect(body.rows.map((row: { email: string }) => row.email)).toEqual([
+      'b@example.com',
+    ]);
   });
 
   it('matches the search term against the email, case-insensitively', async () => {
     const body = (
-      await get(buildTestApp({ seed: fourSubscribers }), '/v1/admin/waitlist?q=B%40EXAMPLE')
+      await get(
+        buildTestApp({ seed: fourSubscribers }),
+        '/v1/admin/waitlist?q=B%40EXAMPLE',
+      )
     ).json();
 
-    expect(body.rows.map((row: { email: string }) => row.email)).toEqual(['b@example.com']);
+    expect(body.rows.map((row: { email: string }) => row.email)).toEqual([
+      'b@example.com',
+    ]);
   });
 
   it('treats a whitespace-only search term as no filter', async () => {
     const body = (
-      await get(buildTestApp({ seed: fourSubscribers }), '/v1/admin/waitlist?q=%20%20')
+      await get(
+        buildTestApp({ seed: fourSubscribers }),
+        '/v1/admin/waitlist?q=%20%20',
+      )
     ).json();
 
     expect(body.rows).toHaveLength(4);
@@ -83,12 +101,17 @@ describe('GET /v1/admin/waitlist', () => {
     expect(first.nextCursor).toEqual(expect.any(String));
 
     const second = (
-      await get(test, `/v1/admin/waitlist?limit=2&cursor=${encodeURIComponent(first.nextCursor)}`)
+      await get(
+        test,
+        `/v1/admin/waitlist?limit=2&cursor=${encodeURIComponent(first.nextCursor)}`,
+      )
     ).json();
 
     expect(second.rows).toHaveLength(2);
     expect(second.nextCursor).toBeUndefined();
-    const seen = [...first.rows, ...second.rows].map((row: { email: string }) => row.email);
+    const seen = [...first.rows, ...second.rows].map(
+      (row: { email: string }) => row.email,
+    );
     expect(new Set(seen).size).toBe(4);
   });
 
@@ -110,7 +133,10 @@ describe('GET /v1/admin/waitlist', () => {
   });
 
   it('rejects a malformed cursor with 400', async () => {
-    const response = await get(buildTestApp(), '/v1/admin/waitlist?cursor=not-a-cursor!!');
+    const response = await get(
+      buildTestApp(),
+      '/v1/admin/waitlist?cursor=not-a-cursor!!',
+    );
 
     expect(response.statusCode).toBe(400);
   });
@@ -120,7 +146,8 @@ describe('GET /v1/admin/waitlist/stats', () => {
   it('counts by status', async () => {
     const test = buildTestApp({
       seed: (s) => {
-        for (const email of ['a', 'b', 'c']) s.seedSubscriber({ email: `${email}@example.com` });
+        for (const email of ['a', 'b', 'c'])
+          s.seedSubscriber({ email: `${email}@example.com` });
         for (const email of ['d', 'e'])
           s.seedSubscriber({ email: `${email}@example.com`, status: 'paused' });
         s.seedSubscriber({ email: 'f@example.com', status: 'unsubscribed' });
@@ -140,7 +167,9 @@ describe('GET /v1/admin/waitlist/stats', () => {
   });
 
   it('reports zeros for an empty list', async () => {
-    // A grouped count returns no row for an absent status, so the zeros have to be filled in.
+    // A grouped count returns no row for an
+    // absent status, so the zeros have to be
+    // filled in.
     const response = await get(buildTestApp(), '/v1/admin/waitlist/stats');
 
     expect(response.json()).toEqual({
@@ -155,7 +184,8 @@ describe('GET /v1/admin/waitlist/stats', () => {
 
 describe('POST /v1/admin/broadcasts', () => {
   const audienceOfFive: Seed = (s) => {
-    for (const email of ['a', 'b', 'c']) s.seedSubscriber({ email: `${email}@example.com` });
+    for (const email of ['a', 'b', 'c'])
+      s.seedSubscriber({ email: `${email}@example.com` });
     for (const email of ['d', 'e'])
       s.seedSubscriber({ email: `${email}@example.com`, status: 'paused' });
     s.seedSubscriber({ email: 'f@example.com', status: 'unsubscribed' });
@@ -167,7 +197,12 @@ describe('POST /v1/admin/broadcasts', () => {
     body: Record<string, unknown>,
     headers: Record<string, string> = adminAuth,
   ) {
-    return test.app.inject({ method: 'POST', url: '/v1/admin/broadcasts', headers, payload: body });
+    return test.app.inject({
+      method: 'POST',
+      url: '/v1/admin/broadcasts',
+      headers,
+      payload: body,
+    });
   }
 
   const validBody = {
@@ -177,7 +212,8 @@ describe('POST /v1/admin/broadcasts', () => {
   };
 
   it('creates the broadcast already sending', async () => {
-    // The same request enqueues the send, so a broadcast is never at rest as a draft.
+    // The same request enqueues the send, so
+    // a broadcast is never at rest as a draft.
     const test = buildTestApp({ seed: audienceOfFive });
 
     const response = await create(test, validBody);
@@ -204,16 +240,23 @@ describe('POST /v1/admin/broadcasts', () => {
   });
 
   it('normalises the actor address before stamping createdBy', async () => {
-    // One admin has to be one string, or the audit trail cannot be grouped by who sent what.
+    // One admin has to be one string, or the
+    // audit trail cannot be grouped by who
+    // sent what.
     const test = buildTestApp({ seed: audienceOfFive });
 
-    await create(test, validBody, { ...auth, 'x-admin-actor': 'Admin@Example.COM' });
+    await create(test, validBody, {
+      ...auth,
+      'x-admin-actor': 'Admin@Example.COM',
+    });
 
     expect(test.store.broadcasts[0]?.createdBy).toBe('admin@example.com');
   });
 
   it('rejects a request with no x-admin-actor', async () => {
-    // There is no legal placeholder: the audit trail's createdBy is an email address.
+    // There is no legal placeholder: the
+    // audit trail's createdBy is an email
+    // address.
     const test = buildTestApp({ seed: audienceOfFive });
 
     const response = await create(test, validBody, auth);
@@ -228,14 +271,19 @@ describe('POST /v1/admin/broadcasts', () => {
     await create(test, validBody);
 
     expect(test.store.deliveries).toHaveLength(5);
-    expect(test.store.deliveries.every((row) => row.status === 'pending')).toBe(true);
+    expect(test.store.deliveries.every((row) => row.status === 'pending')).toBe(
+      true,
+    );
     expect(test.store.broadcasts[0]?.recipientCount).toBe(5);
   });
 
   it('filters suppressed statuses out of the audience it stores and snapshots', async () => {
     const test = buildTestApp({ seed: audienceOfFive });
 
-    await create(test, { ...validBody, audience: ['subscribed', 'unsubscribed', 'bounced'] });
+    await create(test, {
+      ...validBody,
+      audience: ['subscribed', 'unsubscribed', 'bounced'],
+    });
 
     expect(test.store.broadcasts[0]?.audience).toEqual(['subscribed']);
     expect(test.store.deliveries).toHaveLength(3);
@@ -244,7 +292,10 @@ describe('POST /v1/admin/broadcasts', () => {
   it('400s when the effective audience is empty, and enqueues nothing', async () => {
     const test = buildTestApp({ seed: audienceOfFive });
 
-    const response = await create(test, { ...validBody, audience: ['unsubscribed', 'bounced'] });
+    const response = await create(test, {
+      ...validBody,
+      audience: ['unsubscribed', 'bounced'],
+    });
 
     expect(response.statusCode).toBe(400);
     expect(test.store.broadcasts).toHaveLength(0);
@@ -267,7 +318,9 @@ describe('POST /v1/admin/broadcasts', () => {
   });
 
   it('enqueues only after the snapshot is persisted', async () => {
-    // A durable job pointing at a broadcast that then rolled back would never find its rows.
+    // A durable job pointing at a broadcast
+    // that then rolled back would never find
+    // its rows.
     const test = buildTestApp({ seed: audienceOfFive });
     const order: string[] = [];
     const realEnqueue = test.enqueuer.enqueue.bind(test.enqueuer);
@@ -302,7 +355,10 @@ describe('POST /v1/admin/broadcasts/test', () => {
   it('enqueues broadcastTestSend and returns { enqueued: true }', async () => {
     const test = buildTestApp();
 
-    const response = await testSend(test, { ...body, teaserImageUrl: 'https://example.com/x.png' });
+    const response = await testSend(test, {
+      ...body,
+      teaserImageUrl: 'https://example.com/x.png',
+    });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ enqueued: true });
@@ -322,7 +378,9 @@ describe('POST /v1/admin/broadcasts/test', () => {
   });
 
   it('enqueues again on a second identical call', async () => {
-    // An admin who clicks "send me a test" twice wants two emails; idempotency here would be a bug.
+    // An admin who clicks "send me a test"
+    // twice wants two emails; idempotency
+    // here would be a bug.
     const test = buildTestApp();
 
     await testSend(test, body);

@@ -6,11 +6,16 @@ import { completeStatus, effectiveAudience } from '../src/broadcast-status.js';
 
 describe('effectiveAudience', () => {
   it('keeps the two statuses a broadcast may reach', () => {
-    expect(effectiveAudience(['subscribed', 'paused'])).toEqual(['subscribed', 'paused']);
+    expect(effectiveAudience(['subscribed', 'paused'])).toEqual([
+      'subscribed',
+      'paused',
+    ]);
   });
 
   it('drops unsubscribed and bounced', () => {
-    expect(effectiveAudience(['subscribed', 'unsubscribed', 'bounced'])).toEqual(['subscribed']);
+    expect(
+      effectiveAudience(['subscribed', 'unsubscribed', 'bounced']),
+    ).toEqual(['subscribed']);
   });
 
   it('is empty when nothing requested may be reached', () => {
@@ -18,7 +23,10 @@ describe('effectiveAudience', () => {
   });
 
   it('is canonically ordered and deduplicated, whatever the request looked like', () => {
-    expect(effectiveAudience(['paused', 'subscribed', 'paused'])).toEqual(['subscribed', 'paused']);
+    expect(effectiveAudience(['paused', 'subscribed', 'paused'])).toEqual([
+      'subscribed',
+      'paused',
+    ]);
   });
 });
 

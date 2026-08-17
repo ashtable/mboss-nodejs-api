@@ -1,6 +1,10 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 
-import type { BroadcastStatus, DeliveryStatus, SubscriberStatus } from '@mboss/zod';
+import type {
+  BroadcastStatus,
+  DeliveryStatus,
+  SubscriberStatus,
+} from '@mboss/zod';
 
 import type {
   BroadcastListRowData,
@@ -16,24 +20,43 @@ import type {
   TerminalDeliveryStatus,
 } from './types.js';
 
-/** Postgres' unique-violation code, as Prisma reports it. */
+/**
+ * Postgres' unique-violation code, as Prisma
+ * reports it.
+ */
 const UNIQUE_VIOLATION = 'P2002';
 
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === UNIQUE_VIOLATION;
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_VIOLATION
+  );
 }
 
-const NO_DELIVERIES: DeliveryCounts = { pending: 0, sent: 0, failed: 0, skipped: 0 };
+const NO_DELIVERIES: DeliveryCounts = {
+  pending: 0,
+  sent: 0,
+  failed: 0,
+  skipped: 0,
+};
 
+/** Store backed by Postgres, via Prisma. */
 export class PrismaStore implements Store {
   constructor(private readonly prisma: PrismaClient) {}
 
-  // --- task 7 ---
+  // --- the public waitlist ---
 
+  /**
+   * Insert-or-read. The unique index on email
+   * decides ties; see the catch below for the
+   * race path.
+   */
   async findOrCreateSubscriber(
     email: string,
   ): Promise<{ subscriber: SubscriberRow; created: boolean }> {
-    const existing = await this.prisma.subscriber.findUnique({ where: { email } });
+    const existing = await this.prisma.subscriber.findUnique({
+      where: { email },
+    });
     if (existing) return { subscriber: existing, created: false };
 
     try {
@@ -43,9 +66,13 @@ export class PrismaStore implements Store {
       };
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      // Two signups for one address raced between the read and the write. The unique index on
-      // email is what decided it; re-reading is how this request learns who won.
-      const raced = await this.prisma.subscriber.findUniqueOrThrow({ where: { email } });
+      // Two signups for one address raced between
+      // the read and the write. The unique index
+      // on email is what decided it; re-reading
+      // is how this request learns who won.
+      const raced = await this.prisma.subscriber.findUniqueOrThrow({
+        where: { email },
+      });
       return { subscriber: raced, created: false };
     }
   }
@@ -55,32 +82,55 @@ export class PrismaStore implements Store {
   }
 
   /**
-   * Sets the status, stamps the timestamp of the state being entered and clears the other one, so
-   * at most one of `pausedAt` / `unsubscribedAt` is ever set and it says since when the subscriber
-   * has been where they are. Left to accumulate, they would be a partial history that no column
-   * says how to read: a stale `pausedAt` on an unsubscribed row is indistinguishable from a
-   * current one, and a reader would need a rule about which column outranks which.
-   * `tokenVersion` is untouched: leaving the list does not revoke the link that got you here.
+   * Sets the status, stamps the timestamp of the
+   * state being entered and clears the other one,
+   * so at most one of `pausedAt` /
+   * `unsubscribedAt` is ever set and it says
+   * since when the subscriber has been where they
+   * are. Left to accumulate, they would be a
+   * partial history that no column says how to
+   * read: a stale `pausedAt` on an unsubscribed
+   * row is indistinguishable from a current one,
+   * and a reader would need a rule about which
+   * column outranks which. `tokenVersion` is
+   * untouched: leaving the list does not revoke
+   * the link that got you here.
    */
-  async setSubscriberStatus(id: string, status: ManageStatus): Promise<SubscriberRow> {
+  async setSubscriberStatus(
+    id: string,
+    status: ManageStatus,
+  ): Promise<SubscriberRow> {
     const timestamps = {
       subscribed: { pausedAt: null, unsubscribedAt: null },
       paused: { pausedAt: new Date(), unsubscribedAt: null },
       unsubscribed: { pausedAt: null, unsubscribedAt: new Date() },
     }[status];
 
-    return this.prisma.subscriber.update({ where: { id }, data: { status, ...timestamps } });
+    return this.prisma.subscriber.update({
+      where: { id },
+      data: { status, ...timestamps },
+    });
   }
 
-  // --- task 8 ---
+  // --- the admin console ---
 
-  async listSubscribers(query: SubscriberPageQuery): Promise<Page<SubscriberRow>> {
+  /**
+   * Backward keyset pagination — newest first —
+   * with optional status and case-insensitive
+   * email filters.
+   */
+  async listSubscribers(
+    query: SubscriberPageQuery,
+  ): Promise<Page<SubscriberRow>> {
     const { after } = query;
     const rows = await this.prisma.subscriber.findMany({
       where: {
         ...(query.status === undefined ? {} : { status: query.status }),
-        ...(query.q === undefined ? {} : { email: { contains: query.q, mode: 'insensitive' } }),
-        // The keyset is (createdAt, id) because createdAt is not unique.
+        ...(query.q === undefined
+          ? {}
+          : { email: { contains: query.q, mode: 'insensitive' } }),
+        // The keyset is (createdAt, id) because
+        // createdAt is not unique.
         ...(after === undefined
           ? {}
           : {
@@ -91,14 +141,25 @@ export class PrismaStore implements Store {
             }),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      // One extra row is how the caller learns there is another page without a second count query.
+      // One extra row is how the caller learns
+      // there is another page without a second
+      // count query.
       take: query.limit + 1,
     });
 
-    return { rows: rows.slice(0, query.limit), hasMore: rows.length > query.limit };
+    return {
+      rows: rows.slice(0, query.limit),
+      hasMore: rows.length > query.limit,
+    };
   }
 
-  async countSentDeliveriesFor(subscriberIds: string[]): Promise<Map<string, number>> {
+  /**
+   * One groupBy call for every id, not one query
+   * per id.
+   */
+  async countSentDeliveriesFor(
+    subscriberIds: string[],
+  ): Promise<Map<string, number>> {
     if (subscriberIds.length === 0) return new Map();
 
     const grouped = await this.prisma.broadcastDelivery.groupBy({
@@ -116,7 +177,8 @@ export class PrismaStore implements Store {
       _count: { _all: true },
     });
 
-    // A grouped count has no row for a status nobody is in, so the zeros start here.
+    // A grouped count has no row for a status
+    // nobody is in, so the zeros start here.
     const counts: Record<SubscriberStatus, number> = {
       subscribed: 0,
       paused: 0,
@@ -127,18 +189,26 @@ export class PrismaStore implements Store {
     return counts;
   }
 
-  async createBroadcastWithSnapshot(input: CreateBroadcastInput): Promise<BroadcastRow> {
+  async createBroadcastWithSnapshot(
+    input: CreateBroadcastInput,
+  ): Promise<BroadcastRow> {
     return this.prisma.$transaction(async (tx) => {
-      // The audience is resolved inside the transaction so the count and the rows cannot disagree:
-      // a signup landing mid-snapshot is either in both or in neither.
+      // The audience is resolved inside the
+      // transaction so the count and the rows
+      // cannot disagree: a signup landing
+      // mid-snapshot is either in both or in
+      // neither.
       const members = await tx.subscriber.findMany({
         where: { status: { in: input.audience } },
         select: { id: true },
       });
 
-      // Created `sending`, not `draft`: the only route that creates a broadcast enqueues its send
-      // in the same request, so creation is the moment the send starts and there is no draft state
-      // to sit in. `startedAt` records that moment for the same reason.
+      // Created `sending`, not `draft`: the only
+      // route that creates a broadcast enqueues
+      // its send in the same request, so creation
+      // is the moment the send starts and there
+      // is no draft state to sit in. `startedAt`
+      // records that moment for the same reason.
       const broadcast = await tx.broadcast.create({
         data: {
           subject: input.subject,
@@ -152,7 +222,10 @@ export class PrismaStore implements Store {
       });
 
       await tx.broadcastDelivery.createMany({
-        data: members.map((member) => ({ broadcastId: broadcast.id, subscriberId: member.id })),
+        data: members.map((member) => ({
+          broadcastId: broadcast.id,
+          subscriberId: member.id,
+        })),
       });
 
       return tx.broadcast.update({
@@ -162,8 +235,16 @@ export class PrismaStore implements Store {
     });
   }
 
+  /**
+   * Two queries rather than a join: one for
+   * broadcasts, one grouped delivery count keyed
+   * by broadcast and status, joined in memory
+   * below.
+   */
   async listBroadcasts(): Promise<BroadcastListRowData[]> {
-    const broadcasts = await this.prisma.broadcast.findMany({ orderBy: { createdAt: 'desc' } });
+    const broadcasts = await this.prisma.broadcast.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
     if (broadcasts.length === 0) return [];
 
     const grouped = await this.prisma.broadcastDelivery.groupBy({
@@ -191,6 +272,11 @@ export class PrismaStore implements Store {
     return this.prisma.broadcast.findUnique({ where: { id } });
   }
 
+  /**
+   * Starts from the all-zero shape so a status
+   * with no deliveries yet still reads as 0, not
+   * undefined.
+   */
   async countDeliveries(broadcastId: string): Promise<DeliveryCounts> {
     const grouped = await this.prisma.broadcastDelivery.groupBy({
       by: ['status'],
@@ -203,8 +289,14 @@ export class PrismaStore implements Store {
     return counts;
   }
 
-  // --- task 9 ---
+  // --- the worker's internal surface ---
 
+  /**
+   * Ascending single-column cursor on delivery
+   * id, already unique and insertion-ordered —
+   * unlike the two-column keyset listSubscribers
+   * needs.
+   */
   async listPendingRecipients(
     broadcastId: string,
     after: string | undefined,
@@ -219,7 +311,9 @@ export class PrismaStore implements Store {
       orderBy: { id: 'asc' },
       take: limit + 1,
       include: {
-        subscriber: { select: { id: true, email: true, tokenVersion: true, status: true } },
+        subscriber: {
+          select: { id: true, email: true, tokenVersion: true, status: true },
+        },
       },
     });
 
@@ -241,8 +335,10 @@ export class PrismaStore implements Store {
     status: TerminalDeliveryStatus,
     error: string | undefined,
   ): Promise<DeliveryStatus | null> {
-    // One conditional UPDATE, not a read followed by a write: two send steps racing on the same
-    // row would both see `pending` in a read-then-write and both claim it.
+    // One conditional UPDATE, not a read followed
+    // by a write: two send steps racing on the
+    // same row would both see `pending` in a
+    // read-then-write and both claim it.
     await this.prisma.broadcastDelivery.updateMany({
       where: { broadcastId, subscriberId, status: 'pending' },
       data: { status, error: error ?? null },
@@ -261,17 +357,26 @@ export class PrismaStore implements Store {
     status: 'sent' | 'failed',
     at: Date,
   ): Promise<BroadcastStatus | null> {
-    // Conditional on not having completed already, so a replayed final step does not rewrite when
-    // the broadcast finished.
+    // Conditional on not having completed
+    // already, so a replayed final step does not
+    // rewrite when the broadcast finished.
     await this.prisma.broadcast.updateMany({
       where: { id, completedAt: null },
       data: { status, completedAt: at },
     });
 
-    const row = await this.prisma.broadcast.findUnique({ where: { id }, select: { status: true } });
+    const row = await this.prisma.broadcast.findUnique({
+      where: { id },
+      select: { status: true },
+    });
     return row?.status ?? null;
   }
 
+  /**
+   * updateMany rather than update: a missing id
+   * then returns a zero count instead of
+   * throwing, which the route reads as null.
+   */
   async recordConfirmationSent(id: string, at: Date): Promise<Date | null> {
     const { count } = await this.prisma.subscriber.updateMany({
       where: { id },
@@ -282,11 +387,18 @@ export class PrismaStore implements Store {
   }
 
   async markBounced(email: string, at: Date): Promise<boolean> {
-    // Conditional on not already being bounced. Providers retry webhooks, and bumping tokenVersion
-    // on every retry would revoke this subscriber's manage links again and again for one event.
+    // Conditional on not already being bounced.
+    // Providers retry webhooks, and bumping
+    // tokenVersion on every retry would revoke
+    // this subscriber's manage links again and
+    // again for one event.
     const { count } = await this.prisma.subscriber.updateMany({
       where: { email, status: { not: 'bounced' } },
-      data: { status: 'bounced', bouncedAt: at, tokenVersion: { increment: 1 } },
+      data: {
+        status: 'bounced',
+        bouncedAt: at,
+        tokenVersion: { increment: 1 },
+      },
     });
 
     return count > 0;

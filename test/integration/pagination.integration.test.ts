@@ -51,8 +51,12 @@ describe.skipIf(!databaseUrl)('keyset pagination (real Postgres)', () => {
       const url = `/internal/v1/broadcasts/${broadcast.id}/recipients${
         cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`
       }`;
-      const body = (await app.inject({ method: 'GET', url, headers: internalAuth })).json();
-      seen.push(...body.rows.map((row: { subscriberId: string }) => row.subscriberId));
+      const body = (
+        await app.inject({ method: 'GET', url, headers: internalAuth })
+      ).json();
+      seen.push(
+        ...body.rows.map((row: { subscriberId: string }) => row.subscriberId),
+      );
       cursor = body.nextCursor;
     } while (cursor !== undefined);
 
@@ -61,8 +65,11 @@ describe.skipIf(!databaseUrl)('keyset pagination (real Postgres)', () => {
   });
 
   it('matches the search term case-insensitively, as the in-memory double claims', async () => {
-    // Postgres compares case-sensitively by default. The double lowercases both sides, so this is
-    // where the two are checked to agree rather than merely to both pass their own suites.
+    // Postgres compares case-sensitively by
+    // default. The double lowercases both sides,
+    // so this is where the two are checked to
+    // agree rather than merely to both pass
+    // their own suites.
     await prisma.subscriber.createMany({
       data: [
         { email: 'someone@example.com' },
@@ -79,11 +86,15 @@ describe.skipIf(!databaseUrl)('keyset pagination (real Postgres)', () => {
       })
     ).json();
 
-    expect(body.rows.map((row: { email: string }) => row.email)).toEqual(['someone@example.com']);
+    expect(body.rows.map((row: { email: string }) => row.email)).toEqual([
+      'someone@example.com',
+    ]);
   });
 
   it('does not skip subscribers that share a createdAt', async () => {
-    // createdAt alone is not a total order, which is why the cursor carries the id as well.
+    // createdAt alone is not a total order,
+    // which is why the cursor carries the id
+    // as well.
     const createdAt = new Date('2026-08-16T00:00:00.000Z');
     const total = 10;
     await prisma.subscriber.createMany({
@@ -101,7 +112,9 @@ describe.skipIf(!databaseUrl)('keyset pagination (real Postgres)', () => {
       const url = `/v1/admin/waitlist?limit=3${
         cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`
       }`;
-      const body = (await app.inject({ method: 'GET', url, headers: webAuth })).json();
+      const body = (
+        await app.inject({ method: 'GET', url, headers: webAuth })
+      ).json();
       seen.push(...body.rows.map((row: { id: string }) => row.id));
       cursor = body.nextCursor;
     } while (cursor !== undefined);

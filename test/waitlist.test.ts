@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import { mintLink, parseKeyRing, type LinkKeyRing } from '@mboss/core/signed-links';
+import {
+  mintLink,
+  parseKeyRing,
+  type LinkKeyRing,
+} from '@mboss/core/signed-links';
 
-import { buildTestApp, TEST_WEB_SERVICE_TOKEN } from './helpers/build-test-app.js';
+import {
+  buildTestApp,
+  TEST_WEB_SERVICE_TOKEN,
+} from './helpers/build-test-app.js';
 
 const auth = { authorization: `Bearer ${TEST_WEB_SERVICE_TOKEN}` };
 
-/** `iat` must be a whole number of seconds or `mintLink` throws, by design. */
+/**
+ * `iat` must be a whole number of
+ * seconds or `mintLink` throws, by
+ * design.
+ */
 const IAT = Math.floor(Date.UTC(2026, 7, 16) / 1000);
 
 function manageToken(ring: LinkKeyRing, sub: string, tv: number): string {
@@ -43,7 +54,8 @@ describe('POST /v1/waitlist/signups', () => {
 
     await signup(app, 'new@example.com');
 
-    // toEqual fails on an extra key, which is what pins the absence of a deduplicationID.
+    // toEqual fails on an extra key, which is
+    // what pins the absence of a deduplicationID.
     expect(enqueuer.calls).toEqual([
       {
         workflowName: 'confirmationEmail',
@@ -106,7 +118,11 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
 
   it('re-subscribes an unsubscribed email', async () => {
     const { app, store } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'gone@example.com', status: 'unsubscribed' }),
+      seed: (s) =>
+        void s.seedSubscriber({
+          email: 'gone@example.com',
+          status: 'unsubscribed',
+        }),
     });
 
     const response = await signup(app, 'gone@example.com');
@@ -117,7 +133,11 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
 
   it('does not bump tokenVersion when re-subscribing', async () => {
     const { app, store } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'gone@example.com', status: 'unsubscribed' }),
+      seed: (s) =>
+        void s.seedSubscriber({
+          email: 'gone@example.com',
+          status: 'unsubscribed',
+        }),
     });
 
     await signup(app, 'gone@example.com');
@@ -127,7 +147,8 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
 
   it('leaves a paused email paused', async () => {
     const { app, store } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'quiet@example.com', status: 'paused' }),
+      seed: (s) =>
+        void s.seedSubscriber({ email: 'quiet@example.com', status: 'paused' }),
     });
 
     const response = await signup(app, 'quiet@example.com');
@@ -138,7 +159,8 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
 
   it('re-subscribes a bounced email', async () => {
     const { app, store } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
+      seed: (s) =>
+        void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
     });
 
     const response = await signup(app, 'bad@example.com');
@@ -149,7 +171,8 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
 
   it('enqueues a confirmation for a bounced email', async () => {
     const { app, enqueuer } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
+      seed: (s) =>
+        void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
     });
 
     await signup(app, 'bad@example.com');
@@ -165,10 +188,14 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
   });
 
   it('does not bump tokenVersion when a bounced email re-subscribes', async () => {
-    // The bounce already bumped it, retiring the links minted before it. The confirmation this
-    // signup enqueues mints a fresh link at the current version, so nothing needs retiring again.
+    // The bounce already bumped it, retiring
+    // the links minted before it. The
+    // confirmation this signup enqueues mints
+    // a fresh link at the current version, so
+    // nothing needs retiring again.
     const { app, store } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
+      seed: (s) =>
+        void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
     });
 
     await signup(app, 'bad@example.com');
@@ -178,7 +205,11 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
 
   it('still enqueues a confirmation for a re-subscribing email', async () => {
     const { app, enqueuer } = buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'gone@example.com', status: 'unsubscribed' }),
+      seed: (s) =>
+        void s.seedSubscriber({
+          email: 'gone@example.com',
+          status: 'unsubscribed',
+        }),
     });
 
     await signup(app, 'gone@example.com');
@@ -237,9 +268,12 @@ describe('POST /v1/waitlist/signups — the 24h resend rule', () => {
 });
 
 describe('the manage routes', () => {
-  function withSubscriber(status: 'subscribed' | 'paused' | 'unsubscribed' = 'subscribed') {
+  function withSubscriber(
+    status: 'subscribed' | 'paused' | 'unsubscribed' = 'subscribed',
+  ) {
     return buildTestApp({
-      seed: (s) => void s.seedSubscriber({ email: 'member@example.com', status }),
+      seed: (s) =>
+        void s.seedSubscriber({ email: 'member@example.com', status }),
     });
   }
 
@@ -304,15 +338,21 @@ describe('manage token rejection', () => {
   ] as const;
 
   /**
-   * Every rejection is the same 404. These URLs are pasted out of emails and get shared, so the
-   * API never tells an outside observer whether a link is forged, revoked, or points at someone
-   * who does not exist.
+   * Every rejection is the same 404. These
+   * URLs are pasted out of emails and get
+   * shared, so the API never tells an outside
+   * observer whether a link is forged,
+   * revoked, or points at someone who does
+   * not exist.
    */
   function rejectionCases(keyRing: LinkKeyRing): Array<[string, string]> {
     const otherRing = parseKeyRing(`k1:${'22'.repeat(32)}`);
     return [
       ['structurally malformed', 'not-a-token'],
-      ['signed with a key outside the ring', manageToken(otherRing, 'sub_1', 1)],
+      [
+        'signed with a key outside the ring',
+        manageToken(otherRing, 'sub_1', 1),
+      ],
       [
         'of the wrong link type',
         mintLink(keyRing, {
@@ -324,18 +364,32 @@ describe('manage token rejection', () => {
           exp: IAT + 3600,
         }),
       ],
-      ['naming a subscriber that does not exist', manageToken(keyRing, 'sub_404', 1)],
-      ['carrying a token version the subscriber has moved past', manageToken(keyRing, 'sub_1', 1)],
+      [
+        'naming a subscriber that does not exist',
+        manageToken(keyRing, 'sub_404', 1),
+      ],
+      [
+        'carrying a token version the subscriber has moved past',
+        manageToken(keyRing, 'sub_1', 1),
+      ],
     ];
   }
 
   it.each(routes)(
     '%s /v1/waitlist/manage/:token%s rejects every bad token with 404',
     async (method, suffix) => {
-      for (const [label, token] of rejectionCases(parseKeyRing(`k1:${'11'.repeat(32)}`))) {
+      for (const [label, token] of rejectionCases(
+        parseKeyRing(`k1:${'11'.repeat(32)}`),
+      )) {
         const { app } = buildTestApp({
-          // tokenVersion 2 makes the last case — a token minted at version 1 — stale.
-          seed: (s) => void s.seedSubscriber({ email: 'member@example.com', tokenVersion: 2 }),
+          // tokenVersion 2 makes the last
+          // case — a token minted at
+          // version 1 — stale.
+          seed: (s) =>
+            void s.seedSubscriber({
+              email: 'member@example.com',
+              tokenVersion: 2,
+            }),
         });
 
         const response = await app.inject({
@@ -353,7 +407,11 @@ describe('manage token rejection', () => {
     '%s /v1/waitlist/manage/:token%s admits a matching token',
     async (method, suffix) => {
       const { app, keyRing } = buildTestApp({
-        seed: (s) => void s.seedSubscriber({ email: 'member@example.com', tokenVersion: 2 }),
+        seed: (s) =>
+          void s.seedSubscriber({
+            email: 'member@example.com',
+            tokenVersion: 2,
+          }),
       });
 
       const response = await app.inject({

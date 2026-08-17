@@ -22,24 +22,42 @@ import { badRequest, notFound } from '../errors.js';
 import type { RouteDeps } from './deps.js';
 
 /**
- * How many pending deliveries one page carries. It is a constant rather than a query parameter
- * because the worker has no reason to want a different number, and a page size the caller picks is
- * a page size that eventually gets picked badly.
+ * How many pending deliveries one page carries.
+ * It is a constant rather than a query parameter
+ * because the worker has no reason to want a
+ * different number, and a page size the caller
+ * picks is a page size that eventually gets
+ * picked badly.
  */
 export const RECIPIENTS_PAGE_SIZE = 100;
 
 const IdParamsSchema = z.object({ id: z.string().min(1) });
 
+/**
+ * Fastify plugin for the worker's internal
+ * surface: reads of subscribers and broadcasts,
+ * and the writes that record a send's progress.
+ */
 export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
   return async (scope) => {
     const app = scope.withTypeProvider<ZodTypeProvider>();
 
+    /**
+     * One subscriber, as the worker needs it:
+     * status, token version, and confirmation
+     * history.
+     */
     app.route({
       method: 'GET',
       url: '/internal/v1/subscribers/:id',
-      schema: { params: IdParamsSchema, response: { 200: InternalSubscriberResponseSchema } },
+      schema: {
+        params: IdParamsSchema,
+        response: { 200: InternalSubscriberResponseSchema },
+      },
       handler: async (request, reply) => {
-        const subscriber = await deps.store.findSubscriberById(request.params.id);
+        const subscriber = await deps.store.findSubscriberById(
+          request.params.id,
+        );
         if (!subscriber) return notFound(reply);
 
         return {
@@ -47,12 +65,18 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
           email: subscriber.email,
           status: subscriber.status,
           tokenVersion: subscriber.tokenVersion,
-          confirmationEmailSentAt: subscriber.confirmationEmailSentAt?.toISOString() ?? null,
+          confirmationEmailSentAt:
+            subscriber.confirmationEmailSentAt?.toISOString() ?? null,
           createdAt: subscriber.createdAt.toISOString(),
         };
       },
     });
 
+    /**
+     * Records that a confirmation email went out,
+     * so the next signup falls outside the resend
+     * window.
+     */
     app.route({
       method: 'POST',
       url: '/internal/v1/subscribers/:id/confirmation-sent',
@@ -62,18 +86,30 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
         response: { 200: ConfirmationSentResponseSchema },
       },
       handler: async (request, reply) => {
-        // Moving this timestamp forward is also what moves the next resend onto a fresh sendKey.
-        const at = await deps.store.recordConfirmationSent(request.params.id, deps.now());
+        // Moving this timestamp forward is also
+        // what moves the next resend onto a fresh
+        // sendKey.
+        const at = await deps.store.recordConfirmationSent(
+          request.params.id,
+          deps.now(),
+        );
         if (at === null) return notFound(reply);
 
         return { confirmationEmailSentAt: at.toISOString() };
       },
     });
 
+    /**
+     * One broadcast's content and status, as the
+     * worker needs it to send.
+     */
     app.route({
       method: 'GET',
       url: '/internal/v1/broadcasts/:id',
-      schema: { params: IdParamsSchema, response: { 200: InternalBroadcastResponseSchema } },
+      schema: {
+        params: IdParamsSchema,
+        response: { 200: InternalBroadcastResponseSchema },
+      },
       handler: async (request, reply) => {
         const broadcast = await deps.store.findBroadcastById(request.params.id);
         if (!broadcast) return notFound(reply);
@@ -91,6 +127,10 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
       },
     });
 
+    /**
+     * Keyset-paginated pending deliveries for a
+     * broadcast, the worker's send queue.
+     */
     app.route({
       method: 'GET',
       url: '/internal/v1/broadcasts/:id/recipients',
@@ -102,7 +142,8 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
       handler: async (request, reply) => {
         const { cursor } = request.query;
         const after = cursor === undefined ? undefined : decodeIdCursor(cursor);
-        if (after === null) return badRequest(reply, 'cursor is not a cursor this API minted');
+        if (after === null)
+          return badRequest(reply, 'cursor is not a cursor this API minted');
 
         const page = await deps.store.listPendingRecipients(
           request.params.id,
@@ -123,6 +164,10 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
       },
     });
 
+    /**
+     * Records one delivery's outcome — sent or
+     * failed.
+     */
     app.route({
       method: 'POST',
       url: '/internal/v1/broadcasts/:id/deliveries',
@@ -132,9 +177,14 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
         response: { 200: DeliveryFlipResponseSchema },
       },
       handler: async (request, reply) => {
-        // The flip is conditional on the row still being pending, so a replayed send step is a
-        // no-op rather than a double count, and a late failure never overwrites a recorded send.
-        // The status returned is the row's own, which is what makes that observable to the worker.
+        // The flip is conditional on the row
+        // still being pending, so a replayed send
+        // step is a no-op rather than a double
+        // count, and a late failure never
+        // overwrites a recorded send. The status
+        // returned is the row's own, which is
+        // what makes that observable to the
+        // worker.
         const status = await deps.store.flipDelivery(
           request.params.id,
           request.body.subscriberId,
@@ -147,6 +197,11 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
       },
     });
 
+    /**
+     * Marks a broadcast done once the worker has
+     * flipped every delivery, recording the final
+     * counts.
+     */
     app.route({
       method: 'POST',
       url: '/internal/v1/broadcasts/:id/complete',
@@ -173,16 +228,26 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
       },
     });
 
+    /**
+     * Bounce webhook: flips each bounced address
+     * so it stops receiving mail.
+     */
     app.route({
       method: 'POST',
       url: '/internal/v1/email-events',
-      schema: { body: EmailEventsRequestSchema, response: { 200: EmailEventsResponseSchema } },
+      schema: {
+        body: EmailEventsRequestSchema,
+        response: { 200: EmailEventsResponseSchema },
+      },
       handler: async (request) => {
         let bounced = 0;
 
         for (const event of request.body) {
-          // The provider's timestamp is epoch seconds. An address we do not have is not an error:
-          // failing the webhook would only make the provider retry a batch we can never act on.
+          // The provider's timestamp is epoch
+          // seconds. An address we do not have is
+          // not an error: failing the webhook
+          // would only make the provider retry a
+          // batch we can never act on.
           const flipped = await deps.store.markBounced(
             event.email,
             new Date(event.timestamp * 1000),
