@@ -35,7 +35,7 @@ export interface AppDeps {
 export function buildApp(deps: AppDeps): FastifyInstance {
   // A manage link's token is a path parameter of roughly 175 characters — a base64url payload plus
   // a base64url HMAC — and Fastify's default cap of 100 would answer every one of them with a 414.
-  const app = Fastify({ maxParamLength: 512 });
+  const app = Fastify({ routerOptions: { maxParamLength: 512 } });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);

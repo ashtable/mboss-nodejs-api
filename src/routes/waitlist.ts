@@ -46,7 +46,7 @@ export function waitlistRoutes(deps: RouteDeps): FastifyPluginAsync {
         // suppressed until the provider says otherwise.
         const current =
           subscriber.status === 'unsubscribed'
-            ? await deps.store.resubscribe(subscriber.id)
+            ? await deps.store.setSubscriberStatus(subscriber.id, 'subscribed')
             : subscriber;
 
         await enqueueConfirmationIfDue(deps, current);

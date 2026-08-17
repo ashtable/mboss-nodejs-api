@@ -112,12 +112,6 @@ export class FakeStore implements Store {
     return this.subscribers.find((row) => row.id === id) ?? null;
   }
 
-  async resubscribe(id: string): Promise<SubscriberRow> {
-    const row = this.require(id);
-    row.status = 'subscribed';
-    return row;
-  }
-
   async setSubscriberStatus(id: string, status: ManageStatus): Promise<SubscriberRow> {
     const row = this.require(id);
     row.status = status;
