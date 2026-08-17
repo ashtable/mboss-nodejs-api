@@ -41,11 +41,13 @@ export function waitlistRoutes(deps: RouteDeps): FastifyPluginAsync {
         const { email } = request.body;
         const { subscriber } = await deps.store.findOrCreateSubscriber(email);
 
-        // Only `unsubscribed` re-subscribes. A paused subscriber asked to be sent less, not
-        // nothing, and signing up again does not undo a bounce — a suppressed address stays
-        // suppressed until the provider says otherwise.
+        // Signing up again is a request to be on the list, so both of the statuses that mean
+        // "off the list" answer it the same way. `bounced` is included deliberately: a delivery
+        // failure is the provider's verdict on one send, and someone typing their address in
+        // again is fresh evidence against it. `paused` is left alone — that subscriber asked to
+        // be sent less, not nothing, and is already on the list.
         const current =
-          subscriber.status === 'unsubscribed'
+          subscriber.status === 'unsubscribed' || subscriber.status === 'bounced'
             ? await deps.store.setSubscriberStatus(subscriber.id, 'subscribed')
             : subscriber;
 
@@ -116,13 +118,9 @@ async function resolveManageToken(deps: RouteDeps, token: string): Promise<Subsc
 }
 
 async function enqueueConfirmationIfDue(deps: RouteDeps, subscriber: SubscriberRow): Promise<void> {
-  // A bounced address is never mailed again. That status is only ever set from a provider bounce
-  // or spam report, and setting it already revoked this subscriber's live links, so sending to it
-  // again is exactly the reputational damage the status exists to prevent. The check belongs here
-  // rather than in the worker: the worker is decision-free by design, so resend eligibility is
-  // decided in one place, and this route is it.
-  if (subscriber.status === 'bounced') return;
-
+  // Eligibility is decided here rather than in the worker, which is decision-free by design, so
+  // the rule lives in exactly one place. The only bar is the resend window: a subscriber who was
+  // just mailed is not mailed again, however many times the form is submitted.
   if (!shouldEnqueueConfirmation(subscriber.confirmationEmailSentAt, deps.now())) return;
 
   const sendKey = deriveSendKey(subscriber.confirmationEmailSentAt);
