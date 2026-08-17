@@ -1,7 +1,7 @@
 [submodule "mboss-zod"]
 	path = mboss-zod
 	url = https://github.com/ashtable/mboss-zod
-	branch = zod-v0.0.3
+	branch = zod-v0.0.4
 [submodule "mboss-database"]
 	path = mboss-database
 	url = https://github.com/ashtable/mboss-database
