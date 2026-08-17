@@ -136,27 +136,44 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
     expect(store.subscribers[0]?.status).toBe('paused');
   });
 
-  it('leaves a bounced email bounced', async () => {
+  it('re-subscribes a bounced email', async () => {
     const { app, store } = buildTestApp({
       seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
     });
 
     const response = await signup(app, 'bad@example.com');
 
-    expect(response.json().status).toBe('bounced');
-    expect(store.subscribers[0]?.status).toBe('bounced');
+    expect(response.json().status).toBe('subscribed');
+    expect(store.subscribers[0]?.status).toBe('subscribed');
   });
 
-  it('enqueues nothing for a bounced email', async () => {
-    // The provider has already rejected this address; mailing it again is the reputational
-    // damage `bounced` exists to prevent.
+  it('enqueues a confirmation for a bounced email', async () => {
     const { app, enqueuer } = buildTestApp({
       seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
     });
 
     await signup(app, 'bad@example.com');
 
-    expect(enqueuer.calls).toHaveLength(0);
+    expect(enqueuer.calls).toEqual([
+      {
+        workflowName: 'confirmationEmail',
+        queueName: 'email',
+        workflowID: 'confirm:sub_1:0',
+        args: { subscriberId: 'sub_1' },
+      },
+    ]);
+  });
+
+  it('does not bump tokenVersion when a bounced email re-subscribes', async () => {
+    // The bounce already bumped it, retiring the links minted before it. The confirmation this
+    // signup enqueues mints a fresh link at the current version, so nothing needs retiring again.
+    const { app, store } = buildTestApp({
+      seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
+    });
+
+    await signup(app, 'bad@example.com');
+
+    expect(store.subscribers[0]?.tokenVersion).toBe(1);
   });
 
   it('still enqueues a confirmation for a re-subscribing email', async () => {
