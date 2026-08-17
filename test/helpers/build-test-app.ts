@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 
-import { parseKeyRing } from '@mboss/core/signed-links';
+import { parseKeyRing, type LinkKeyRing } from '@mboss/core/signed-links';
 
 import { buildApp } from '../../src/app.js';
+import { FakeEnqueuer } from '../fakes/fake-enqueuer.js';
+import { FakeStore } from '../fakes/fake-store.js';
 
 /** A fixed ring so a test can mint a token the app under test will accept. */
 export const TEST_LINK_KEYS = `k1:${'11'.repeat(32)}`;
@@ -11,14 +13,34 @@ export const TEST_INTERNAL_API_TOKEN = 'test-internal-api-token';
 
 export interface TestApp {
   app: FastifyInstance;
+  store: FakeStore;
+  enqueuer: FakeEnqueuer;
+  keyRing: LinkKeyRing;
 }
 
-export function buildTestApp(): TestApp {
+export interface TestAppOptions {
+  /** Seeds fixtures before the app is built. */
+  seed?: (store: FakeStore) => void;
+  /** A fixed instant, for the routes whose behaviour depends on how long ago something happened. */
+  now?: Date;
+}
+
+export function buildTestApp(options: TestAppOptions = {}): TestApp {
+  const store = new FakeStore();
+  const enqueuer = new FakeEnqueuer();
+  const keyRing = parseKeyRing(TEST_LINK_KEYS);
+
+  options.seed?.(store);
+
+  const fixedNow = options.now;
   const app = buildApp({
-    keyRing: parseKeyRing(TEST_LINK_KEYS),
+    store,
+    enqueuer,
+    keyRing,
     webServiceToken: TEST_WEB_SERVICE_TOKEN,
     internalApiToken: TEST_INTERNAL_API_TOKEN,
+    ...(fixedNow ? { now: () => fixedNow } : {}),
   });
 
-  return { app };
+  return { app, store, enqueuer, keyRing };
 }
