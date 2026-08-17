@@ -203,6 +203,15 @@ describe('POST /v1/admin/broadcasts', () => {
     expect(test.store.broadcasts[0]?.createdBy).toBe('admin@example.com');
   });
 
+  it('normalises the actor address before stamping createdBy', async () => {
+    // One admin has to be one string, or the audit trail cannot be grouped by who sent what.
+    const test = buildTestApp({ seed: audienceOfFive });
+
+    await create(test, validBody, { ...auth, 'x-admin-actor': 'Admin@Example.COM' });
+
+    expect(test.store.broadcasts[0]?.createdBy).toBe('admin@example.com');
+  });
+
   it('rejects a request with no x-admin-actor', async () => {
     // There is no legal placeholder: the audit trail's createdBy is an email address.
     const test = buildTestApp({ seed: audienceOfFive });

@@ -9,6 +9,7 @@ import {
   BroadcastListResponseSchema,
   BroadcastResponseSchema,
   CreateBroadcastRequestSchema,
+  emailSchema,
   TestSendRequestSchema,
   TestSendResponseSchema,
   WaitlistStatsResponseSchema,
@@ -25,8 +26,11 @@ import type { RouteDeps } from './deps.js';
  * credential — authentication is the bearer token, and only `mboss-web` holds that. Validating it
  * as an address here means a missing header fails loudly instead of writing a placeholder into
  * `Broadcast.createdBy`, which the wire declares to be an email.
+ *
+ * The shared rule rather than a local one, because it also normalizes: `Admin@Example.com` and
+ * `admin@example.com` are one admin, and an audit trail that stores them as two cannot be grouped.
  */
-const AdminActorSchema = z.object({ 'x-admin-actor': z.email() });
+const AdminActorSchema = z.object({ 'x-admin-actor': emailSchema });
 
 const BroadcastParamsSchema = z.object({ id: z.string().min(1) });
 
