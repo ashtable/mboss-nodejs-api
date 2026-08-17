@@ -3,22 +3,39 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { SubscriberStatus } from '@mboss/zod';
 
-import { buildIntegrationApp, createPrisma, databaseUrl, reset, webAuth } from './helpers/db.js';
+import {
+  buildIntegrationApp,
+  createPrisma,
+  databaseUrl,
+  reset,
+  webAuth,
+} from './helpers/db.js';
 
 /**
- * A client whose delivery insert fails once the transaction is already open. Wrapping the
- * transaction client from outside keeps the production interface free of a test-only seam, and it
- * also means the test notices if the snapshot ever stops being one transaction: without
- * `$transaction` the substitution never happens and nothing throws.
+ * A client whose delivery insert fails
+ * once the transaction is already open.
+ * Wrapping the transaction client from
+ * outside keeps the production interface
+ * free of a test-only seam, and it also
+ * means the test notices if the snapshot
+ * ever stops being one transaction:
+ * without `$transaction` the
+ * substitution never happens and
+ * nothing throws.
  */
 function failingDeliveryInsert(prisma: PrismaClient): PrismaClient {
-  const transaction = (callback: (tx: unknown) => Promise<unknown>): Promise<unknown> =>
+  const transaction = (
+    callback: (tx: unknown) => Promise<unknown>,
+  ): Promise<unknown> =>
     prisma.$transaction((tx) =>
       callback(
         new Proxy(tx, {
           get: (target, property) =>
             property === 'broadcastDelivery'
-              ? { createMany: () => Promise.reject(new Error('delivery insert failed')) }
+              ? {
+                  createMany: () =>
+                    Promise.reject(new Error('delivery insert failed')),
+                }
               : Reflect.get(target, property),
         }),
       ),
@@ -42,7 +59,9 @@ describe.skipIf(!databaseUrl)('broadcast snapshot (real Postgres)', () => {
     await prisma?.$disconnect();
   });
 
-  async function seedSubscribers(counts: Partial<Record<SubscriberStatus, number>>): Promise<void> {
+  async function seedSubscribers(
+    counts: Partial<Record<SubscriberStatus, number>>,
+  ): Promise<void> {
     const data = Object.entries(counts).flatMap(([status, count]) =>
       Array.from({ length: count }, (_unused, index) => ({
         email: `${status}-${index}@example.com`,
@@ -52,12 +71,19 @@ describe.skipIf(!databaseUrl)('broadcast snapshot (real Postgres)', () => {
     await prisma.subscriber.createMany({ data });
   }
 
-  function createBroadcast(app: ReturnType<typeof buildIntegrationApp>['app'], audience: string[]) {
+  function createBroadcast(
+    app: ReturnType<typeof buildIntegrationApp>['app'],
+    audience: string[],
+  ) {
     return app.inject({
       method: 'POST',
       url: '/v1/admin/broadcasts',
       headers: webAuth,
-      payload: { subject: 'Release notes', bodyMarkdown: 'What changed.', audience },
+      payload: {
+        subject: 'Release notes',
+        bodyMarkdown: 'What changed.',
+        audience,
+      },
     });
   }
 
@@ -77,9 +103,13 @@ describe.skipIf(!databaseUrl)('broadcast snapshot (real Postgres)', () => {
     await seedSubscribers({ subscribed: 3, paused: 2 });
     const { app } = buildIntegrationApp(prisma);
 
-    const { id } = (await createBroadcast(app, ['subscribed', 'paused'])).json();
+    const { id } = (
+      await createBroadcast(app, ['subscribed', 'paused'])
+    ).json();
 
-    const broadcast = await prisma.broadcast.findUniqueOrThrow({ where: { id } });
+    const broadcast = await prisma.broadcast.findUniqueOrThrow({
+      where: { id },
+    });
     expect(broadcast.recipientCount).toBe(
       await prisma.broadcastDelivery.count({ where: { broadcastId: id } }),
     );
@@ -101,10 +131,17 @@ describe.skipIf(!databaseUrl)('broadcast snapshot (real Postgres)', () => {
   });
 
   it('excludes unsubscribed and bounced members even when they are in the table', async () => {
-    await seedSubscribers({ subscribed: 2, paused: 1, unsubscribed: 4, bounced: 3 });
+    await seedSubscribers({
+      subscribed: 2,
+      paused: 1,
+      unsubscribed: 4,
+      bounced: 3,
+    });
     const { app } = buildIntegrationApp(prisma);
 
-    const { id } = (await createBroadcast(app, ['subscribed', 'paused'])).json();
+    const { id } = (
+      await createBroadcast(app, ['subscribed', 'paused'])
+    ).json();
 
     const deliveries = await prisma.broadcastDelivery.findMany({
       where: { broadcastId: id },
@@ -132,7 +169,9 @@ describe.skipIf(!databaseUrl)('broadcast snapshot (real Postgres)', () => {
       }),
     ).rejects.toThrow('delivery insert failed');
 
-    // The broadcast row is written before the deliveries, so its absence is the rollback.
+    // The broadcast row is written before
+    // the deliveries, so its absence is
+    // the rollback.
     expect(await prisma.broadcast.count()).toBe(0);
     expect(await prisma.broadcastDelivery.count()).toBe(0);
   });

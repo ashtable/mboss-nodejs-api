@@ -5,9 +5,12 @@ import type { onRequestAsyncHookHandler } from 'fastify';
 const BEARER = 'Bearer ';
 
 /**
- * The two service tokens are long-lived shared secrets, so the comparison is constant-time. The
- * length guard is not an optimization — `timingSafeEqual` throws on buffers of unequal length —
- * and a differing length is not a secret worth protecting anyway.
+ * The two service tokens are long-lived shared
+ * secrets, so the comparison is constant-time.
+ * The length guard is not an optimization —
+ * `timingSafeEqual` throws on buffers of unequal
+ * length — and a differing length is not a secret
+ * worth protecting anyway.
  */
 function matches(presented: string, expected: string): boolean {
   const a = Buffer.from(presented, 'utf8');
@@ -16,9 +19,11 @@ function matches(presented: string, expected: string): boolean {
 }
 
 /**
- * Guards a plugin scope with one bearer token. Every rejection looks the same from outside: the
- * caller is another service holding a fixed secret, so there is nothing useful to tell it apart
- * from a caller holding nothing.
+ * Guards a plugin scope with one bearer token.
+ * Every rejection looks the same from outside:
+ * the caller is another service holding a fixed
+ * secret, so there is nothing useful to tell it
+ * apart from a caller holding nothing.
  */
 export function requireBearer(expected: string): onRequestAsyncHookHandler {
   return async (request, reply) => {

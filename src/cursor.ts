@@ -7,8 +7,11 @@ function encode(value: string): string {
 }
 
 /**
- * Node's base64url decoder drops invalid characters rather than throwing, so decoding alone proves
- * nothing. Re-encoding and comparing is the real check: only canonical base64url survives it.
+ * Node's base64url decoder drops invalid
+ * characters rather than throwing, so decoding
+ * alone proves nothing. Re-encoding and comparing
+ * is the real check: only canonical base64url
+ * survives it.
  */
 function decode(raw: string): string | null {
   const bytes = Buffer.from(raw, 'base64url');
@@ -16,12 +19,17 @@ function decode(raw: string): string | null {
 }
 
 /**
- * The admin list is ordered by `createdAt` descending, and `createdAt` is not unique — two people
- * can sign up in the same millisecond. Carrying the id alongside it gives the keyset a total
- * order, so a page boundary can never skip or repeat a row.
+ * The admin list is ordered by `createdAt`
+ * descending, and `createdAt` is not unique — two
+ * people can sign up in the same millisecond.
+ * Carrying the id alongside it gives the keyset a
+ * total order, so a page boundary can never skip
+ * or repeat a row.
  */
 export function encodeSubscriberCursor(position: SubscriberCursor): string {
-  return encode(`${position.createdAt.toISOString()}${SEPARATOR}${position.id}`);
+  return encode(
+    `${position.createdAt.toISOString()}${SEPARATOR}${position.id}`,
+  );
 }
 
 export function decodeSubscriberCursor(raw: string): SubscriberCursor | null {
@@ -38,7 +46,10 @@ export function decodeSubscriberCursor(raw: string): SubscriberCursor | null {
   return { createdAt, id };
 }
 
-/** Deliveries page on their own id, which is already a total order — no tiebreaker needed. */
+/**
+ * Deliveries page on their own id, which is
+ * already a total order — no tiebreaker needed.
+ */
 export function encodeIdCursor(id: string): string {
   return encode(id);
 }

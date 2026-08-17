@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 /**
- * The five secrets and URLs the service cannot run without, plus two operational knobs that have
- * sensible defaults. Railway injects `PORT`.
+ * The five secrets and URLs the service cannot
+ * run without, plus two operational knobs that
+ * have sensible defaults. Railway injects `PORT`.
  */
 const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -17,9 +18,11 @@ const EnvSchema = z.object({
 export type Env = z.infer<typeof EnvSchema>;
 
 /**
- * Throws with every missing or malformed variable named at once. A service that boots without its
- * bearer tokens would answer unauthenticated requests, so this failure has to be loud and total
- * rather than per-variable and lazy.
+ * Throws with every missing or malformed variable
+ * named at once. A service that boots without its
+ * bearer tokens would answer unauthenticated
+ * requests, so this failure has to be loud and
+ * total rather than per-variable and lazy.
  */
 export function readEnv(source: NodeJS.ProcessEnv): Env {
   const result = EnvSchema.safeParse(source);

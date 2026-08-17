@@ -21,7 +21,9 @@ function post({ app }: TestApp, url: string, payload: object = {}) {
 
 describe('GET /internal/v1/subscribers/:id', () => {
   it('returns the internal subscriber shape', async () => {
-    const test = buildTestApp({ seed: (s) => void s.seedSubscriber({ email: 'a@example.com' }) });
+    const test = buildTestApp({
+      seed: (s) => void s.seedSubscriber({ email: 'a@example.com' }),
+    });
 
     const response = await get(test, '/internal/v1/subscribers/sub_1');
 
@@ -37,7 +39,10 @@ describe('GET /internal/v1/subscribers/:id', () => {
   });
 
   it('404s for an unknown id', async () => {
-    expect((await get(buildTestApp(), '/internal/v1/subscribers/sub_404')).statusCode).toBe(404);
+    expect(
+      (await get(buildTestApp(), '/internal/v1/subscribers/sub_404'))
+        .statusCode,
+    ).toBe(404);
   });
 
   it('rejects the web service token — the two tokens are not interchangeable', async () => {
@@ -56,16 +61,22 @@ describe('GET /internal/v1/subscribers/:id', () => {
 });
 
 describe('POST /internal/v1/subscribers/:id/confirmation-sent', () => {
-  const seedOne: Seed = (s) => void s.seedSubscriber({ email: 'a@example.com' });
+  const seedOne: Seed = (s) =>
+    void s.seedSubscriber({ email: 'a@example.com' });
 
   it('records the timestamp and reports it back', async () => {
     const now = new Date('2026-08-16T10:00:00.000Z');
     const test = buildTestApp({ seed: seedOne, now });
 
-    const response = await post(test, '/internal/v1/subscribers/sub_1/confirmation-sent');
+    const response = await post(
+      test,
+      '/internal/v1/subscribers/sub_1/confirmation-sent',
+    );
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ confirmationEmailSentAt: now.toISOString() });
+    expect(response.json()).toEqual({
+      confirmationEmailSentAt: now.toISOString(),
+    });
 
     const refetched = await get(test, '/internal/v1/subscribers/sub_1');
     expect(refetched.json().confirmationEmailSentAt).toBe(now.toISOString());
@@ -74,9 +85,13 @@ describe('POST /internal/v1/subscribers/:id/confirmation-sent', () => {
   it('strips unknown body keys rather than rejecting them', async () => {
     const test = buildTestApp({ seed: seedOne });
 
-    const response = await post(test, '/internal/v1/subscribers/sub_1/confirmation-sent', {
-      unexpected: true,
-    });
+    const response = await post(
+      test,
+      '/internal/v1/subscribers/sub_1/confirmation-sent',
+      {
+        unexpected: true,
+      },
+    );
 
     expect(response.statusCode).toBe(200);
   });
@@ -91,7 +106,9 @@ describe('POST /internal/v1/subscribers/:id/confirmation-sent', () => {
   });
 
   it('moves the next resend onto a fresh sendKey', async () => {
-    // Recording a send is what makes the following signup a resend rather than a repeat.
+    // Recording a send is what makes the
+    // following signup a resend rather than
+    // a repeat.
     const sentAt = new Date('2026-08-01T00:00:00.000Z');
     const test = buildTestApp({ seed: seedOne, now: sentAt });
 
@@ -100,7 +117,10 @@ describe('POST /internal/v1/subscribers/:id/confirmation-sent', () => {
     const later = buildTestApp({
       now: new Date('2026-08-16T00:00:00.000Z'),
       seed: (s) =>
-        void s.seedSubscriber({ email: 'a@example.com', confirmationEmailSentAt: sentAt }),
+        void s.seedSubscriber({
+          email: 'a@example.com',
+          confirmationEmailSentAt: sentAt,
+        }),
     });
     await later.app.inject({
       method: 'POST',
@@ -109,14 +129,17 @@ describe('POST /internal/v1/subscribers/:id/confirmation-sent', () => {
       payload: { email: 'a@example.com' },
     });
 
-    expect(later.enqueuer.calls[0]?.workflowID).toBe('confirm:sub_1:1785542400');
+    expect(later.enqueuer.calls[0]?.workflowID).toBe(
+      'confirm:sub_1:1785542400',
+    );
   });
 });
 
 describe('GET /internal/v1/broadcasts/:id', () => {
   it('returns the internal broadcast shape', async () => {
     const test = buildTestApp({
-      seed: (s) => void s.seedBroadcast({ status: 'sending', recipientCount: 4 }),
+      seed: (s) =>
+        void s.seedBroadcast({ status: 'sending', recipientCount: 4 }),
     });
 
     const response = await get(test, '/internal/v1/broadcasts/bc_1');
@@ -134,7 +157,9 @@ describe('GET /internal/v1/broadcasts/:id', () => {
   });
 
   it('404s for an unknown id', async () => {
-    expect((await get(buildTestApp(), '/internal/v1/broadcasts/bc_404')).statusCode).toBe(404);
+    expect(
+      (await get(buildTestApp(), '/internal/v1/broadcasts/bc_404')).statusCode,
+    ).toBe(404);
   });
 });
 
@@ -153,20 +178,27 @@ describe('GET /internal/v1/broadcasts/:id/recipients', () => {
 
   it('pages only the pending deliveries', async () => {
     const body = (
-      await get(buildTestApp({ seed: mixedDeliveries }), '/internal/v1/broadcasts/bc_1/recipients')
+      await get(
+        buildTestApp({ seed: mixedDeliveries }),
+        '/internal/v1/broadcasts/bc_1/recipients',
+      )
     ).json();
 
-    expect(body.rows.map((row: { subscriberId: string }) => row.subscriberId)).toEqual([
-      'sub_1',
-      'sub_2',
-    ]);
+    expect(
+      body.rows.map((row: { subscriberId: string }) => row.subscriberId),
+    ).toEqual(['sub_1', 'sub_2']);
     expect(body.nextCursor).toBeUndefined();
   });
 
   it("reports the subscriber's live status, not the audience it was snapshotted into", async () => {
-    // This is what lets the worker skip someone who left the audience part-way through.
+    // This is what lets the worker skip
+    // someone who left the audience
+    // part-way through.
     const body = (
-      await get(buildTestApp({ seed: mixedDeliveries }), '/internal/v1/broadcasts/bc_1/recipients')
+      await get(
+        buildTestApp({ seed: mixedDeliveries }),
+        '/internal/v1/broadcasts/bc_1/recipients',
+      )
     ).json();
 
     expect(body.rows[1]).toEqual({
@@ -189,7 +221,9 @@ describe('GET /internal/v1/broadcasts/:id/recipients', () => {
       },
     });
 
-    const first = (await get(test, '/internal/v1/broadcasts/bc_1/recipients')).json();
+    const first = (
+      await get(test, '/internal/v1/broadcasts/bc_1/recipients')
+    ).json();
     expect(first.rows).toHaveLength(RECIPIENTS_PAGE_SIZE);
     expect(first.nextCursor).toEqual(expect.any(String));
 
@@ -242,7 +276,10 @@ describe('POST /internal/v1/broadcasts/:id/deliveries', () => {
   it('flips a pending row to sent', async () => {
     const test = buildTestApp({ seed: onePending });
 
-    const response = await flip(test, { subscriberId: 'sub_1', status: 'sent' });
+    const response = await flip(test, {
+      subscriberId: 'sub_1',
+      status: 'sent',
+    });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'sent' });
@@ -256,14 +293,20 @@ describe('POST /internal/v1/broadcasts/:id/deliveries', () => {
     const second = await flip(test, { subscriberId: 'sub_1', status: 'sent' });
 
     expect(second.json()).toEqual({ status: 'sent' });
-    expect(test.store.deliveries.filter((row) => row.status === 'sent')).toHaveLength(1);
+    expect(
+      test.store.deliveries.filter((row) => row.status === 'sent'),
+    ).toHaveLength(1);
   });
 
   it('a conflicting second flip reports the status the row already had', async () => {
     const test = buildTestApp({ seed: onePending });
 
     await flip(test, { subscriberId: 'sub_1', status: 'sent' });
-    const second = await flip(test, { subscriberId: 'sub_1', status: 'failed', error: 'too late' });
+    const second = await flip(test, {
+      subscriberId: 'sub_1',
+      status: 'failed',
+      error: 'too late',
+    });
 
     expect(second.json()).toEqual({ status: 'sent' });
     expect(test.store.deliveries[0]?.status).toBe('sent');
@@ -272,7 +315,11 @@ describe('POST /internal/v1/broadcasts/:id/deliveries', () => {
   it('persists the error on a failed flip', async () => {
     const test = buildTestApp({ seed: onePending });
 
-    await flip(test, { subscriberId: 'sub_1', status: 'failed', error: '550 mailbox unavailable' });
+    await flip(test, {
+      subscriberId: 'sub_1',
+      status: 'failed',
+      error: '550 mailbox unavailable',
+    });
 
     expect(test.store.deliveries[0]?.error).toBe('550 mailbox unavailable');
   });
@@ -280,7 +327,10 @@ describe('POST /internal/v1/broadcasts/:id/deliveries', () => {
   it('rejects a request asking to move a row back to pending', async () => {
     const test = buildTestApp({ seed: onePending });
 
-    const response = await flip(test, { subscriberId: 'sub_1', status: 'pending' });
+    const response = await flip(test, {
+      subscriberId: 'sub_1',
+      status: 'pending',
+    });
 
     expect(response.statusCode).toBe(400);
   });
@@ -288,7 +338,10 @@ describe('POST /internal/v1/broadcasts/:id/deliveries', () => {
   it('404s when the broadcast has no delivery for that subscriber', async () => {
     const test = buildTestApp({ seed: onePending });
 
-    const response = await flip(test, { subscriberId: 'sub_404', status: 'sent' });
+    const response = await flip(test, {
+      subscriberId: 'sub_404',
+      status: 'sent',
+    });
 
     expect(response.statusCode).toBe(404);
   });
@@ -306,7 +359,9 @@ describe('POST /internal/v1/broadcasts/:id/complete', () => {
   }
 
   it('marks a broadcast sent and reports the counts', async () => {
-    const test = buildTestApp({ seed: seedWith(['sent', 'sent', 'failed', 'skipped']) });
+    const test = buildTestApp({
+      seed: seedWith(['sent', 'sent', 'failed', 'skipped']),
+    });
 
     const response = await post(test, '/internal/v1/broadcasts/bc_1/complete');
 
@@ -323,7 +378,9 @@ describe('POST /internal/v1/broadcasts/:id/complete', () => {
   it('marks a broadcast failed only when every delivery failed', async () => {
     const test = buildTestApp({ seed: seedWith(['failed', 'failed']) });
 
-    expect((await post(test, '/internal/v1/broadcasts/bc_1/complete')).json()).toEqual({
+    expect(
+      (await post(test, '/internal/v1/broadcasts/bc_1/complete')).json(),
+    ).toEqual({
       status: 'failed',
       sentCount: 0,
       failedCount: 2,
@@ -343,14 +400,16 @@ describe('POST /internal/v1/broadcasts/:id/complete', () => {
   });
 
   it('404s for an unknown broadcast', async () => {
-    expect((await post(buildTestApp(), '/internal/v1/broadcasts/bc_404/complete')).statusCode).toBe(
-      404,
-    );
+    expect(
+      (await post(buildTestApp(), '/internal/v1/broadcasts/bc_404/complete'))
+        .statusCode,
+    ).toBe(404);
   });
 });
 
 describe('POST /internal/v1/email-events', () => {
-  const seedOne: Seed = (s) => void s.seedSubscriber({ email: 'a@example.com' });
+  const seedOne: Seed = (s) =>
+    void s.seedSubscriber({ email: 'a@example.com' });
   const at = 1_785_542_400;
 
   function send(test: TestApp, events: object) {
@@ -362,7 +421,9 @@ describe('POST /internal/v1/email-events', () => {
     async (event) => {
       const test = buildTestApp({ seed: seedOne });
 
-      const response = await send(test, [{ email: 'a@example.com', event, timestamp: at }]);
+      const response = await send(test, [
+        { email: 'a@example.com', event, timestamp: at },
+      ]);
 
       expect(response.json()).toEqual({ processed: 1, bounced: 1 });
       expect(test.store.subscribers[0]?.status).toBe('bounced');
@@ -372,7 +433,9 @@ describe('POST /internal/v1/email-events', () => {
   );
 
   it('replaying a batch does not bump tokenVersion again', async () => {
-    // Providers retry webhooks; an unconditional update would revoke the manage links every time.
+    // Providers retry webhooks; an
+    // unconditional update would revoke the
+    // manage links every time.
     const test = buildTestApp({ seed: seedOne });
     const batch = [{ email: 'a@example.com', event: 'bounce', timestamp: at }];
 
@@ -395,13 +458,17 @@ describe('POST /internal/v1/email-events', () => {
   });
 
   it('rejects an empty batch', async () => {
-    expect((await send(buildTestApp({ seed: seedOne }), [])).statusCode).toBe(400);
+    expect((await send(buildTestApp({ seed: seedOne }), [])).statusCode).toBe(
+      400,
+    );
   });
 
   it('rejects an event type it does not recognise', async () => {
     const test = buildTestApp({ seed: seedOne });
 
-    const response = await send(test, [{ email: 'a@example.com', event: 'open', timestamp: at }]);
+    const response = await send(test, [
+      { email: 'a@example.com', event: 'open', timestamp: at },
+    ]);
 
     expect(response.statusCode).toBe(400);
     expect(test.store.subscribers[0]?.status).toBe('subscribed');
@@ -418,7 +485,9 @@ describe('POST /internal/v1/email-events', () => {
     });
     expect(test.store.subscribers[0]?.tokenVersion).toBe(1);
 
-    await send(test, [{ email: 'a@example.com', event: 'bounce', timestamp: at }]);
+    await send(test, [
+      { email: 'a@example.com', event: 'bounce', timestamp: at },
+    ]);
     expect(test.store.subscribers[0]?.tokenVersion).toBe(2);
   });
 });

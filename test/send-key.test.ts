@@ -22,14 +22,20 @@ describe('shouldEnqueueConfirmation', () => {
   });
 
   it('does not enqueue inside the window', () => {
-    expect(shouldEnqueueConfirmation(new Date(now.getTime() - 60_000), now)).toBe(false);
+    expect(
+      shouldEnqueueConfirmation(new Date(now.getTime() - 60_000), now),
+    ).toBe(false);
   });
 
   it('does not enqueue at exactly 24h — the rule is more than 24h old', () => {
-    expect(shouldEnqueueConfirmation(new Date(now.getTime() - DAY_MS), now)).toBe(false);
+    expect(
+      shouldEnqueueConfirmation(new Date(now.getTime() - DAY_MS), now),
+    ).toBe(false);
   });
 
   it('enqueues one millisecond past 24h', () => {
-    expect(shouldEnqueueConfirmation(new Date(now.getTime() - DAY_MS - 1), now)).toBe(true);
+    expect(
+      shouldEnqueueConfirmation(new Date(now.getTime() - DAY_MS - 1), now),
+    ).toBe(true);
   });
 });
