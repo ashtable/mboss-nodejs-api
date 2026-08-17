@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@mboss/zod": ["./mboss-zod/src/index.ts"],
+      "@mboss/core/signed-links": ["./mboss-core/src/signed-links/index.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "test",
+    "prisma.config.ts",
+    "vitest.aliases.ts",
+    "vitest.config.ts",
+    "vitest.integration.config.ts",
+    "eslint.config.mjs"
+  ]
+}
