@@ -162,6 +162,9 @@ export class FakeStore implements Store {
 
   async createBroadcastWithSnapshot(input: CreateBroadcastInput): Promise<BroadcastRow> {
     const members = this.subscribers.filter((row) => input.audience.includes(row.status));
+    // The real store stamps `startedAt` with its own clock; here it is the row's own createdAt,
+    // which keeps the fake deterministic while modelling the same "created means started".
+    const createdAt = this.nextCreatedAt();
     const broadcast = this.seedBroadcast({
       subject: input.subject,
       bodyMarkdown: input.bodyMarkdown,
@@ -169,6 +172,9 @@ export class FakeStore implements Store {
       teaserImageUrl: input.teaserImageUrl,
       createdBy: input.createdBy,
       recipientCount: members.length,
+      status: 'sending',
+      createdAt,
+      startedAt: createdAt,
     });
 
     for (const member of members) this.seedDelivery(broadcast.id, member.id, 'pending');

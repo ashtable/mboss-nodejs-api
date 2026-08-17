@@ -133,6 +133,9 @@ export class PrismaStore implements Store {
         select: { id: true },
       });
 
+      // Created `sending`, not `draft`: the only route that creates a broadcast enqueues its send
+      // in the same request, so creation is the moment the send starts and there is no draft state
+      // to sit in. `startedAt` records that moment for the same reason.
       const broadcast = await tx.broadcast.create({
         data: {
           subject: input.subject,
@@ -140,6 +143,8 @@ export class PrismaStore implements Store {
           audience: input.audience,
           teaserImageUrl: input.teaserImageUrl,
           createdBy: input.createdBy,
+          status: 'sending',
+          startedAt: new Date(),
         },
       });
 

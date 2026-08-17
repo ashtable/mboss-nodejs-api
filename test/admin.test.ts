@@ -176,13 +176,23 @@ describe('POST /v1/admin/broadcasts', () => {
     audience: ['subscribed', 'paused'],
   };
 
-  it('creates a draft broadcast', async () => {
+  it('creates the broadcast already sending', async () => {
+    // The same request enqueues the send, so a broadcast is never at rest as a draft.
     const test = buildTestApp({ seed: audienceOfFive });
 
     const response = await create(test, validBody);
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ id: 'bc_1', status: 'draft' });
+    expect(response.json()).toEqual({ id: 'bc_1', status: 'sending' });
+    expect(test.store.broadcasts[0]?.status).toBe('sending');
+  });
+
+  it('stamps startedAt when it creates the broadcast', async () => {
+    const test = buildTestApp({ seed: audienceOfFive });
+
+    await create(test, validBody);
+
+    expect(test.store.broadcasts[0]?.startedAt).toBeInstanceOf(Date);
   });
 
   it('stamps createdBy from the x-admin-actor header', async () => {

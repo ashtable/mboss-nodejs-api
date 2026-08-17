@@ -86,6 +86,20 @@ describe.skipIf(!databaseUrl)('broadcast snapshot (real Postgres)', () => {
     expect(broadcast.recipientCount).toBe(5);
   });
 
+  it('writes the broadcast as sending with startedAt set, in the creating transaction', async () => {
+    await seedSubscribers({ subscribed: 1 });
+    const { app } = buildIntegrationApp(prisma);
+
+    const response = await createBroadcast(app, ['subscribed']);
+
+    expect(response.json()).toMatchObject({ status: 'sending' });
+    const broadcast = await prisma.broadcast.findUniqueOrThrow({
+      where: { id: response.json().id },
+    });
+    expect(broadcast.status).toBe('sending');
+    expect(broadcast.startedAt).not.toBeNull();
+  });
+
   it('excludes unsubscribed and bounced members even when they are in the table', async () => {
     await seedSubscribers({ subscribed: 2, paused: 1, unsubscribed: 4, bounced: 3 });
     const { app } = buildIntegrationApp(prisma);
