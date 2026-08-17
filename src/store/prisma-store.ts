@@ -55,15 +55,18 @@ export class PrismaStore implements Store {
   }
 
   /**
-   * Sets the status and clears the timestamp of the state being left, so `pausedAt` and
-   * `unsubscribedAt` describe a subscriber's current state rather than accumulating history.
+   * Sets the status, stamps the timestamp of the state being entered and clears the other one, so
+   * at most one of `pausedAt` / `unsubscribedAt` is ever set and it says since when the subscriber
+   * has been where they are. Left to accumulate, they would be a partial history that no column
+   * says how to read: a stale `pausedAt` on an unsubscribed row is indistinguishable from a
+   * current one, and a reader would need a rule about which column outranks which.
    * `tokenVersion` is untouched: leaving the list does not revoke the link that got you here.
    */
   async setSubscriberStatus(id: string, status: ManageStatus): Promise<SubscriberRow> {
     const timestamps = {
       subscribed: { pausedAt: null, unsubscribedAt: null },
-      paused: { pausedAt: new Date() },
-      unsubscribed: { unsubscribedAt: new Date() },
+      paused: { pausedAt: new Date(), unsubscribedAt: null },
+      unsubscribed: { pausedAt: null, unsubscribedAt: new Date() },
     }[status];
 
     return this.prisma.subscriber.update({ where: { id }, data: { status, ...timestamps } });

@@ -103,9 +103,11 @@ export interface Store {
   findOrCreateSubscriber(email: string): Promise<{ subscriber: SubscriberRow; created: boolean }>;
   findSubscriberById(id: string): Promise<SubscriberRow | null>;
   /**
-   * Sets the status and clears the timestamp of the state being left. Never touches
-   * `tokenVersion` — leaving the list does not revoke the link that got you here; only a bounce
-   * does. Re-subscribing is this same call with `subscribed`, not a separate operation.
+   * Sets the status, stamping the timestamp of the state being entered and clearing the other, so
+   * at most one of `pausedAt` / `unsubscribedAt` is set and it always names the current state.
+   * Never touches `tokenVersion` — leaving the list does not revoke the link that got you here;
+   * only a bounce does. Re-subscribing is this same call with `subscribed`, not a separate
+   * operation.
    */
   setSubscriberStatus(id: string, status: ManageStatus): Promise<SubscriberRow>;
 
