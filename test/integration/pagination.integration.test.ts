@@ -60,6 +60,28 @@ describe.skipIf(!databaseUrl)('keyset pagination (real Postgres)', () => {
     expect(new Set(seen).size).toBe(total);
   });
 
+  it('matches the search term case-insensitively, as the in-memory double claims', async () => {
+    // Postgres compares case-sensitively by default. The double lowercases both sides, so this is
+    // where the two are checked to agree rather than merely to both pass their own suites.
+    await prisma.subscriber.createMany({
+      data: [
+        { email: 'someone@example.com' },
+        { email: 'nobody@elsewhere.test', status: 'paused' },
+      ],
+    });
+    const { app } = buildIntegrationApp(prisma);
+
+    const body = (
+      await app.inject({
+        method: 'GET',
+        url: '/v1/admin/waitlist?q=SOMEONE%40EXAMPLE',
+        headers: webAuth,
+      })
+    ).json();
+
+    expect(body.rows.map((row: { email: string }) => row.email)).toEqual(['someone@example.com']);
+  });
+
   it('does not skip subscribers that share a createdAt', async () => {
     // createdAt alone is not a total order, which is why the cursor carries the id as well.
     const createdAt = new Date('2026-08-16T00:00:00.000Z');
