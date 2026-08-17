@@ -18,9 +18,11 @@ export interface TestApp {
   keyRing: LinkKeyRing;
 }
 
+export type Seed = (store: FakeStore) => void;
+
 export interface TestAppOptions {
   /** Seeds fixtures before the app is built. */
-  seed?: (store: FakeStore) => void;
+  seed?: Seed;
   /** A fixed instant, for the routes whose behaviour depends on how long ago something happened. */
   now?: Date;
 }

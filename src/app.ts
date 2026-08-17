@@ -7,6 +7,7 @@ import { requireBearer } from './auth.js';
 import type { WorkflowEnqueuer } from './enqueue/types.js';
 import { installErrorHandler } from './errors.js';
 import type { RouteDeps } from './routes/deps.js';
+import { adminRoutes } from './routes/admin.js';
 import { healthRoutes } from './routes/health.js';
 import { waitlistRoutes } from './routes/waitlist.js';
 import type { Store } from './store/types.js';
@@ -51,6 +52,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(async (scope) => {
     scope.addHook('onRequest', requireBearer(deps.webServiceToken));
     await scope.register(waitlistRoutes(routeDeps));
+    await scope.register(adminRoutes(routeDeps));
   });
 
   return app;
