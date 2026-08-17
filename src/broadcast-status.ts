@@ -1,4 +1,4 @@
-import type { SubscriberStatus } from '@mboss/zod';
+import type { DeliveryCounts, SubscriberStatus } from '@mboss/zod';
 
 /**
  * The only two statuses a broadcast may reach. An unsubscribed address asked not to be written to
@@ -16,4 +16,17 @@ const SENDABLE: SubscriberStatus[] = ['subscribed', 'paused'];
  */
 export function effectiveAudience(requested: SubscriberStatus[]): SubscriberStatus[] {
   return SENDABLE.filter((status) => requested.includes(status));
+}
+
+/**
+ * A broadcast is `failed` only when every last delivery failed; anything short of that is `sent`.
+ *
+ * Two boundaries follow from that rule and are deliberate. A broadcast whose every recipient was
+ * skipped resolves to `sent` — nobody was written to, but nothing went wrong either. So does one
+ * with no deliveries at all. `sending` is never an outcome: it is the transient state a broadcast
+ * passes through, not a state an admin has to act on.
+ */
+export function completeStatus(counts: DeliveryCounts): 'sent' | 'failed' {
+  const total = counts.pending + counts.sent + counts.failed + counts.skipped;
+  return total > 0 && counts.failed === total ? 'failed' : 'sent';
 }

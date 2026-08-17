@@ -2,6 +2,12 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { requireBearer } from '../src/auth.js';
+import {
+  buildTestApp,
+  TEST_INTERNAL_API_TOKEN,
+  TEST_WEB_SERVICE_TOKEN,
+  type Seed,
+} from './helpers/build-test-app.js';
 
 const TOKEN = 'the-right-token';
 
@@ -60,5 +66,45 @@ describe('requireBearer', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ reached: true });
+  });
+});
+
+describe('the two token scopes', () => {
+  const web = `Bearer ${TEST_WEB_SERVICE_TOKEN}`;
+  const internal = `Bearer ${TEST_INTERNAL_API_TOKEN}`;
+  const seedOne: Seed = (s) => void s.seedSubscriber({ email: 'a@example.com' });
+
+  function reach(authorization: string | undefined, url: string) {
+    const { app } = buildTestApp({ seed: seedOne });
+    return app.inject({
+      method: 'GET',
+      url,
+      ...(authorization === undefined ? {} : { headers: { authorization } }),
+    });
+  }
+
+  it.each([
+    ['no token', undefined, '/v1/admin/waitlist', 401],
+    ['the web token', web, '/v1/admin/waitlist', 200],
+    ['the internal token', internal, '/v1/admin/waitlist', 401],
+    ['no token', undefined, '/internal/v1/subscribers/sub_1', 401],
+    ['the internal token', internal, '/internal/v1/subscribers/sub_1', 200],
+    ['the web token', web, '/internal/v1/subscribers/sub_1', 401],
+  ])('%s on %s gives %i', async (_label, authorization, url, expected) => {
+    expect((await reach(authorization, url)).statusCode).toBe(expected);
+  });
+
+  it('treats a missing x-admin-actor as a bad request, not an authentication failure', async () => {
+    // Authentication is the bearer token; the header is an audit value mboss-web supplies.
+    const { app } = buildTestApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/broadcasts',
+      headers: { authorization: web },
+      payload: { subject: 'Hi', bodyMarkdown: 'There', audience: ['subscribed'] },
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 });
