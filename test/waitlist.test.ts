@@ -146,6 +146,35 @@ describe('POST /v1/waitlist/signups — a repeat signup', () => {
     expect(response.json().status).toBe('bounced');
     expect(store.subscribers[0]?.status).toBe('bounced');
   });
+
+  it('enqueues nothing for a bounced email', async () => {
+    // The provider has already rejected this address; mailing it again is the reputational
+    // damage `bounced` exists to prevent.
+    const { app, enqueuer } = buildTestApp({
+      seed: (s) => void s.seedSubscriber({ email: 'bad@example.com', status: 'bounced' }),
+    });
+
+    await signup(app, 'bad@example.com');
+
+    expect(enqueuer.calls).toHaveLength(0);
+  });
+
+  it('still enqueues a confirmation for a re-subscribing email', async () => {
+    const { app, enqueuer } = buildTestApp({
+      seed: (s) => void s.seedSubscriber({ email: 'gone@example.com', status: 'unsubscribed' }),
+    });
+
+    await signup(app, 'gone@example.com');
+
+    expect(enqueuer.calls).toEqual([
+      {
+        workflowName: 'confirmationEmail',
+        queueName: 'email',
+        workflowID: 'confirm:sub_1:0',
+        args: { subscriberId: 'sub_1' },
+      },
+    ]);
+  });
 });
 
 describe('POST /v1/waitlist/signups — the 24h resend rule', () => {

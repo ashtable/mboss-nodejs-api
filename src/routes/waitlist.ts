@@ -116,6 +116,13 @@ async function resolveManageToken(deps: RouteDeps, token: string): Promise<Subsc
 }
 
 async function enqueueConfirmationIfDue(deps: RouteDeps, subscriber: SubscriberRow): Promise<void> {
+  // A bounced address is never mailed again. That status is only ever set from a provider bounce
+  // or spam report, and setting it already revoked this subscriber's live links, so sending to it
+  // again is exactly the reputational damage the status exists to prevent. The check belongs here
+  // rather than in the worker: the worker is decision-free by design, so resend eligibility is
+  // decided in one place, and this route is it.
+  if (subscriber.status === 'bounced') return;
+
   if (!shouldEnqueueConfirmation(subscriber.confirmationEmailSentAt, deps.now())) return;
 
   const sendKey = deriveSendKey(subscriber.confirmationEmailSentAt);
