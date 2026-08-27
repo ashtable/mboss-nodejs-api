@@ -416,21 +416,18 @@ describe('POST /internal/v1/email-events', () => {
     return post(test, '/internal/v1/email-events', events);
   }
 
-  it.each(['bounce', 'spamreport'])(
-    'a %s suppresses the address and revokes its links',
-    async (event) => {
-      const test = buildTestApp({ seed: seedOne });
+  it('a bounce suppresses the address and revokes its links', async () => {
+    const test = buildTestApp({ seed: seedOne });
 
-      const response = await send(test, [
-        { email: 'a@example.com', event, timestamp: at },
-      ]);
+    const response = await send(test, [
+      { email: 'a@example.com', event: 'bounce', timestamp: at },
+    ]);
 
-      expect(response.json()).toEqual({ processed: 1, bounced: 1 });
-      expect(test.store.subscribers[0]?.status).toBe('bounced');
-      expect(test.store.subscribers[0]?.tokenVersion).toBe(2);
-      expect(test.store.bouncedAt.get('sub_1')).toEqual(new Date(at * 1000));
-    },
-  );
+    expect(response.json()).toEqual({ processed: 1, bounced: 1 });
+    expect(test.store.subscribers[0]?.status).toBe('bounced');
+    expect(test.store.subscribers[0]?.tokenVersion).toBe(2);
+    expect(test.store.bouncedAt.get('sub_1')).toEqual(new Date(at * 1000));
+  });
 
   it('replaying a batch does not bump tokenVersion again', async () => {
     // Providers retry webhooks; an
@@ -463,16 +460,19 @@ describe('POST /internal/v1/email-events', () => {
     );
   });
 
-  it('rejects an event type it does not recognise', async () => {
-    const test = buildTestApp({ seed: seedOne });
+  it.each(['open', 'spamreport'])(
+    'rejects an event type it does not recognise (%s)',
+    async (event) => {
+      const test = buildTestApp({ seed: seedOne });
 
-    const response = await send(test, [
-      { email: 'a@example.com', event: 'open', timestamp: at },
-    ]);
+      const response = await send(test, [
+        { email: 'a@example.com', event, timestamp: at },
+      ]);
 
-    expect(response.statusCode).toBe(400);
-    expect(test.store.subscribers[0]?.status).toBe('subscribed');
-  });
+      expect(response.statusCode).toBe(400);
+      expect(test.store.subscribers[0]?.status).toBe('subscribed');
+    },
+  );
 
   it('is the only route that bumps tokenVersion', async () => {
     const test = buildTestApp({ seed: seedOne });

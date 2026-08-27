@@ -229,8 +229,11 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
     });
 
     /**
-     * Bounce webhook: flips each bounced address
-     * so it stops receiving mail.
+     * The worker's bounce scan is the only
+     * caller — there is no provider webhook any
+     * more. It posts the addresses it found
+     * undeliverable, and this flips each one so
+     * it stops receiving mail.
      */
     app.route({
       method: 'POST',
@@ -243,11 +246,11 @@ export function internalRoutes(deps: RouteDeps): FastifyPluginAsync {
         let bounced = 0;
 
         for (const event of request.body) {
-          // The provider's timestamp is epoch
+          // The scan's timestamp is epoch
           // seconds. An address we do not have is
-          // not an error: failing the webhook
-          // would only make the provider retry a
-          // batch we can never act on.
+          // not an error: failing the batch would
+          // only make the scan retry a batch it
+          // can never act on.
           const flipped = await deps.store.markBounced(
             event.email,
             new Date(event.timestamp * 1000),
